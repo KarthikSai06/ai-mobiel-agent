@@ -13,7 +13,7 @@ class AdbController:
         """Executes an adb command and returns the output as a string."""
         cmd = [self.adb_path] + list(args)
         try:
-            # Capture output and check for errors
+                                                 
             result = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='replace')
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
@@ -30,7 +30,7 @@ class AdbController:
         if not output:
             return []
             
-        lines = output.strip().split("\n")[1:] # Skip 'List of devices attached'
+        lines = output.strip().split("\n")[1:]                                  
         devices = []
         for line in lines:
             if "\tdevice" in line:
@@ -45,15 +45,15 @@ class AdbController:
         cmd.extend(["shell", "dumpsys", "window"])
         
         output = self.run_cmd(*cmd)
-        # Look for the line containing mCurrentFocus
+                                                    
         for line in output.splitlines():
             if "mCurrentFocus" in line:
-                # Output looks like: mCurrentFocus=Window{... u0 org.telegram.messenger/org.telegram.ui.LaunchActivity}
+                                                                                                                       
                 if "/" in line:
                     parts = line.split(" ")
                     for part in parts:
                         if "/" in part:
-                            # Extract package name before the /
+                                                               
                             return part.split("/")[0].split("{")[-1].split("}")[0].strip()
         return ""
 
@@ -76,3 +76,24 @@ class AdbController:
                 if not filter_str or filter_str.lower() in package_name.lower():
                     packages.append(package_name)
         return packages
+
+    def take_screenshot(self, filename: str, device_id: str = None) -> bool:
+        """Takes a screenshot of the device and saves it to the specified path."""
+        import os
+        sdcard_path = "/sdcard/screen_dump.png"
+        
+                                      
+        cmd1 = []
+        if device_id:
+            cmd1.extend(["-s", device_id])
+        cmd1.extend(["shell", "screencap", "-p", sdcard_path])
+        self.run_cmd(*cmd1)
+        
+                                             
+        cmd2 = []
+        if device_id:
+            cmd2.extend(["-s", device_id])
+        cmd2.extend(["pull", sdcard_path, filename])
+        self.run_cmd(*cmd2)
+        
+        return os.path.exists(filename)

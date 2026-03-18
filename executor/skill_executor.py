@@ -8,9 +8,9 @@ class SkillExecutor:
     def __init__(self, adb: AdbController, device_id: str = None):
         self.adb = adb
         self.device_id = device_id
-        self.last_elements = []  # To store the last parsed UI state
+        self.last_elements = []                                     
         
-        # Map skill names to their corresponding execute functions
+                                                                  
         self.skills = {
             "tap": tap.execute,
             "type_text": type_text.execute,
@@ -24,32 +24,59 @@ class SkillExecutor:
         self.last_elements = elements
 
     def _resolve_id_to_coords(self, args: dict) -> dict:
-        """If 'id' is present in args, resolve it to 'x' and 'y' using last_elements index or node_id."""
-        if "id" in args and self.last_elements:
-            node_id = str(args["id"])
-            
-            # Try to resolve by index if it's a number (as formatted in format_ui_elements_for_llm)
-            if node_id.isdigit():
-                idx = int(node_id)
-                if 0 <= idx < len(self.last_elements):
-                    element = self.last_elements[idx]
-                    cx, cy = element.get("center_x"), element.get("center_y")
-                    if cx is not None and cy is not None:
-                        args["x"] = cx
-                        args["y"] = cy
-                        args.pop("id", None)
-                        logger.info(f"Resolved index ID {node_id} to coordinates ({cx}, {cy}). Element: {element}")
-                        return args
+        """Resolve 'id' in args to x/y coordinates using last_elements (by index or resource_id)."""
+        if "id" not in args or not self.last_elements:
+            return args
 
-            # Fallback to searching by node_id or resource_id if we ever store those
-            for element in self.last_elements:
-                if str(element.get("resource_id")) == node_id:
-                    args["x"] = element["center_x"]
-                    args["y"] = element["center_y"]
+        node_id = str(args["id"])
+
+        # Try numeric index first
+        if node_id.isdigit():
+            idx = int(node_id)
+            if 0 <= idx < len(self.last_elements):
+                element = self.last_elements[idx]
+                cx, cy = element.get("center_x"), element.get("center_y")
+                if cx is not None and cy is not None:
+                    args["x"] = cx
+                    args["y"] = cy
                     args.pop("id", None)
-                    logger.info(f"Resolved resource ID {node_id} to coordinates ({args['x']}, {args['y']})")
-                    break
+                    logger.info(f"Resolved index ID {node_id} → ({cx}, {cy})")
+                    return args
+
+        # Try resource_id string match
+        for element in self.last_elements:
+            if str(element.get("resource_id")) == node_id:
+                args["x"] = element["center_x"]
+                args["y"] = element["center_y"]
+                args.pop("id", None)
+                logger.info(f"Resolved resource ID {node_id} → ({args['x']}, {args['y']})")
+                return args
+
         return args
+
+    def _resolve_text_to_coords(self, args: dict) -> dict:
+        """
+        If the LLM sends tap(text='Telegram') instead of tap(id=N),
+        search last_elements by text or content-desc and resolve to x/y.
+        """
+        label = args.pop("text", None)
+        if not label or not self.last_elements:
+            if label:
+                args["text"] = label  # put it back if we can't resolve
+            return args
+
+        label_lower = label.lower()
+        for element in self.last_elements:
+            el_text = str(element.get("text", "")).lower()
+            el_desc = str(element.get("content_desc", "")).lower()
+            if label_lower in el_text or label_lower in el_desc:
+                args["x"] = element["center_x"]
+                args["y"] = element["center_y"]
+                logger.info(f"Resolved text='{label}' → ({args['x']}, {args['y']}) via element text/desc")
+                return args
+
+        logger.warning(f"Could not resolve text='{label}' to any UI element. Tap will be skipped.")
+        return args  # x/y still missing → executor will skip gracefully
 
     def execute_skill(self, skill_name: str, args: dict) -> bool:
         """
@@ -61,22 +88,40 @@ class SkillExecutor:
             
         skill_func = self.skills[skill_name]
         
-        # Resolve IDs if present
-        # Always resolve id to x, y if possible, then remove id
+                                
+                                                               
         if "id" in args:
             args = self._resolve_id_to_coords(args)
-            args.pop("id", None) # Ensure it's gone even if not resolved
-        
+            args.pop("id", None)
+
+        # For tap: if x/y still absent but LLM sent text=, resolve via element label
+        if skill_name == "tap" and "x" not in args and "y" not in args and "text" in args:
+            args = self._resolve_text_to_coords(args)
+
+        # Guard: tap requires x and y — fail fast if still missing after all resolution
+        if skill_name == "tap" and ("x" not in args or "y" not in args):
+            logger.error(f"tap skill called without x/y and could not resolve them from args {args}. Skipping.")
+            return False
+
         import inspect
         sig = inspect.signature(skill_func)
         valid_args = sig.parameters.keys()
         
-        # Inject standard arguments
+                                   
         call_args = {"adb": self.adb, "device_id": self.device_id}
         
-        # Filter and add skill-specific arguments
+        import re
+        
+                                                 
         for k, v in args.items():
             if k in valid_args:
+                                                                                            
+                if k in ['x', 'y', 'x1', 'y1', 'x2', 'y2'] and isinstance(v, str):
+                    try:
+                        clean_val = re.sub(r'[^\d-]', '', str(v))
+                        v = int(clean_val) if clean_val else 0
+                    except Exception as e:
+                        logger.warning(f"Failed to sanitize coordinate {k}={v}: {e}")
                 call_args[k] = v
             else:
                 logger.warning(f"Skill {skill_name} doesn't accept argument {k}. Skipping.")

@@ -8,33 +8,42 @@ logger = logging.getLogger(__name__)
 
 def dump_ui_hierarchy(adb: AdbController, device_id: str = None) -> str:
     """
-    Dumps the UI hierarchy from the Android device and pulls the XML file to the local storage.
-    Returns the path to the downloaded XML file.
+    Dumps the UI hierarchy from the Android device and pulls the XML file to local storage.
+    On each failure, performs a small scroll to try to unblock uiautomator
+    (e.g. when a YouTube ad / fullscreen video is playing).
+    Returns the local XML path on success, or "" after 3 scroll attempts.
     """
     remote_path = "/sdcard/ui_dump.xml"
     local_filename = f"ui_dump_{int(time.time())}.xml"
     local_path = os.path.join(settings.STORAGE_DIR, local_filename)
-    
+
     cmd_prefix = []
     if device_id:
         cmd_prefix = ["-s", device_id]
 
     logger.info("Dumping UI hierarchy...")
-    
-    # Dump UI
-    dump_cmd = cmd_prefix + ["shell", "uiautomator", "dump", remote_path]
-    dump_output = adb.run_cmd(*dump_cmd)
-    
-    if "UI hierchary dumped to" not in dump_output and "dumped to" not in dump_output:
-        logger.warning(f"Unexpected output from uiautomator dump: {dump_output}")
 
-    # Pull the file
-    pull_cmd = cmd_prefix + ["pull", remote_path, local_path]
-    adb.run_cmd(*pull_cmd)
-    
-    if os.path.exists(local_path):
-        logger.info(f"UI dumped to {local_path}")
-        return local_path
-    else:
-        logger.error("Failed to pull UI dump.")
-        return ""
+    for attempt in range(4):  # attempt 0 = first try, attempts 1-3 = scroll + retry
+        adb.run_cmd(*(cmd_prefix + ["shell", "rm", "-f", remote_path]))
+        time.sleep(1.5)
+
+        dump_output = adb.run_cmd(*(cmd_prefix + ["shell", "uiautomator", "dump", remote_path]))
+        if "UI hierchary dumped to" not in dump_output and "dumped to" not in dump_output:
+            logger.warning(f"Unexpected uiautomator output on attempt {attempt+1}: {dump_output}")
+
+        time.sleep(0.5)
+
+        adb.run_cmd(*(cmd_prefix + ["pull", remote_path, local_path]))
+        if os.path.exists(local_path):
+            logger.info(f"UI dumped to {local_path} on attempt {attempt+1}")
+            return local_path
+
+        logger.warning(f"UI dump failed on attempt {attempt+1}.")
+        if attempt < 3:
+            # Scroll slightly to nudge the view and unblock uiautomator
+            logger.info(f"Scrolling to unblock UI dump (attempt {attempt+1}/3)...")
+            adb.run_cmd(*(cmd_prefix + ["shell", "input", "swipe", "500", "1000", "500", "800", "300"]))
+            time.sleep(2.5)
+
+    logger.error("UI dump failed after 3 scroll attempts. Signalling for vision recovery.")
+    return ""

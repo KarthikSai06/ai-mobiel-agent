@@ -12,7 +12,7 @@ def execute(adb: AdbController, text: str, x: int = None, y: int = None, device_
         logger.info(f"Tapping at ({x}, {y}) before typing.")
         adb.run_cmd("shell", "input", "tap", str(x), str(y))
     
-    # ADB input text doesn't handle spaces well unless properly escaped
+                                                                       
     escaped_text = text.replace(" ", "%s")
     cmd = []
     if device_id:

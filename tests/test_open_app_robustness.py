@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-# Add project root to path
+                          
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from device.adb_controller import AdbController
@@ -29,16 +29,16 @@ class TestOpenAppRobustness(unittest.TestCase):
         self.assertEqual(self.adb.run_cmd.call_count, 1)
 
     def test_open_app_fallback_success(self):
-        # Initial launch fails to change focus
-        # 1. Initial check: ""
-        # 2. Launch verification: "old.package"
-        # 3. Fallback verification: "com.android.settings"
+                                              
+                              
+                                               
+                                                          
         self.adb.get_current_focus.side_effect = ["", "old.package", "com.android.settings"]
         self.adb.list_packages.return_value = ["com.android.settings"]
         
         result = open_app.execute(self.adb, "settings")
         self.assertTrue(result)
-        # Should call run_cmd twice (initial + fallback)
+                                                        
         self.assertEqual(self.adb.run_cmd.call_count, 2)
         self.adb.list_packages.assert_called_with("settings", None)
 

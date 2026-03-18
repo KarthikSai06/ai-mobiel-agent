@@ -27,7 +27,7 @@ def main():
     logger = logging.getLogger(__name__)
     logger.info("Initializing Mobile Agent...")
     
-    # Initialize and run agent
+                              
     agent = AgentLoop(device_id=args.device)
     agent.run(task=args.task, max_steps=args.steps)
 

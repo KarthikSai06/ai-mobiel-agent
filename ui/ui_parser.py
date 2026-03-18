@@ -33,7 +33,7 @@ def parse_ui_xml(xml_path: str) -> list:
         print(f"Failed to parse XML: {e}")
         return elements
 
-    # Traverse all node elements
+                                
     for node in root.iter("node"):
         bounds_str = node.attrib.get("bounds", "")
         if not bounds_str or bounds_str == "[0,0][0,0]":
@@ -46,7 +46,7 @@ def parse_ui_xml(xml_path: str) -> list:
         clickable = node.attrib.get("clickable", "false").lower() == "true"
         class_name = node.attrib.get("class", "")
 
-        # Typically, we only care about interactable elements or elements with text
+                                                                                   
         if clickable or text or content_desc:
             element_info = {
                 "text": text,
