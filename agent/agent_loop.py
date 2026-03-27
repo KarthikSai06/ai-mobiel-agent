@@ -67,7 +67,7 @@ class AgentLoop:
                     logger.info(f"Vision recovery action: {recovery}")
                     if recovery.get("skill") in ["tap", "scroll"]:
                         self.executor.execute_skill(recovery["skill"], recovery.get("args", {}))
-                        time.sleep(2.5)  # wait for screen to settle after tap
+                        time.sleep(1.0)  # wait for screen to settle after tap
 
                         # Check if the task is now complete (e.g. video is playing)
                         verify_path = os.path.join(settings.SCREENSHOTS_DIR, f"verify_{step}.png")
@@ -108,7 +108,7 @@ class AgentLoop:
                     if vision_action.get("skill") in ["tap", "scroll"]:
                         self.executor.execute_skill(vision_action["skill"], vision_action.get("args", {}))
                 no_change_streak = 0
-                time.sleep(2.0)
+                time.sleep(1.0)
                 continue
 
             action_plan = self.planner.plan_next_action(task, ui_str, self.history)
@@ -145,24 +145,16 @@ class AgentLoop:
                 outcome = "SUCCESS" if tap_success else "FAILED"
                 self.history.append({"action": f"{skill_name}({args})", "outcome": outcome})
                 logger.info(f"History entry (vision locate): {skill_name}({args}) → {outcome}")
-                time.sleep(2.0)
+                time.sleep(1.0)
                 continue
 
             success = bool(result)
 
-            # Re-dump UI after the action to detect whether anything changed
-            post_xml_path = dump_ui_hierarchy(self.adb, self.device_id)
-            post_ui_str = ""
-            if post_xml_path:
-                post_elements = parse_ui_xml(post_xml_path)
-                post_ui_str = format_ui_elements_for_llm(post_elements)
-
+            # Outcome is determined by whether the skill reported success.
+            # NO_CHANGE detection now happens implicitly at the next step via last_ui_str comparison.
             if not success:
                 outcome = "FAILED"
                 logger.warning("Action execution failed or returned False.")
-            elif post_ui_str and post_ui_str == ui_str:
-                outcome = "NO_CHANGE"
-                logger.info("Action executed but UI did not change (e.g., keyboard pop-up or scroll end).")
             else:
                 outcome = "SUCCESS"
 
@@ -193,9 +185,9 @@ class AgentLoop:
                 if not vision_tapped:
                     logger.warning("Vision gave no tap — falling back to BACK key.")
                     self.executor.execute_skill("press_key", {"key": "BACK"})
-                time.sleep(1.5)
+                time.sleep(0.8)
 
-            time.sleep(2.0)
+            time.sleep(1.0)
             
         else:
             logger.warning(f"Task reached maximum steps ({max_steps}) without finishing.")

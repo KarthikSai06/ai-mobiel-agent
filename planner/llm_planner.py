@@ -59,6 +59,7 @@ Rules:
   10. Output ONLY the two lines below — nothing else.
   11. CRITICAL — Sending messages: After typing your message text, FIRST try tapping the Send button (desc='Send'). If the UI does NOT change after tapping it (outcome=NO_CHANGE), immediately switch to press_key ENTER to send the message instead of tapping Send repeatedly.
   12. CRITICAL — SCROLLING: Any time your objective requires finding an element that logically exists on the page (e.g., a search result, a 'Submit'/'Add' button, an older message, or a setting) but it is NOT visible in the current UI Elements list, you MUST output a `scroll` action. Do NOT tap randomly, guess coordinates, repeat your previous tap, or give up. Scroll (usually x1=500 y1=1500 x2=500 y2=500) to find it.
+  13. CRITICAL — ONLY USE SKILLS FROM THE LIST ABOVE. Do NOT invent or use skills like 'search', 'find', 'query', 'swipe', 'input', or any other name not listed. There is NO 'search' skill. To search inside an app (Gmail, YouTube, etc.), you MUST: (a) tap the search icon/bar shown in UI Elements, then (b) use type_text to type the search query, then (c) press_key ENTER.
 
 Format (copy exactly):
 SKILL: <name>

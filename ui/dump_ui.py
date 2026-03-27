@@ -25,13 +25,13 @@ def dump_ui_hierarchy(adb: AdbController, device_id: str = None) -> str:
 
     for attempt in range(2):  # attempt 0 = first try, attempt 1 = scroll + retry
         adb.run_cmd(*(cmd_prefix + ["shell", "rm", "-f", remote_path]))
-        time.sleep(1.5)
+        time.sleep(0.4)
 
         dump_output = adb.run_cmd(*(cmd_prefix + ["shell", "uiautomator", "dump", remote_path]))
         if "UI hierchary dumped to" not in dump_output and "dumped to" not in dump_output:
             logger.warning(f"Unexpected uiautomator output on attempt {attempt+1}: {dump_output}")
 
-        time.sleep(0.5)
+        time.sleep(0.2)
 
         adb.run_cmd(*(cmd_prefix + ["pull", remote_path, local_path]))
         if os.path.exists(local_path):
@@ -43,7 +43,7 @@ def dump_ui_hierarchy(adb: AdbController, device_id: str = None) -> str:
             # Scroll significantly to nudge the view and unblock uiautomator
             logger.info(f"Scrolling to unblock UI dump (attempt {attempt+1}/1)...")
             adb.run_cmd(*(cmd_prefix + ["shell", "input", "swipe", "500", "1500", "500", "500", "300"]))
-            time.sleep(2.5)
+            time.sleep(1.5)
 
     logger.error("UI dump failed after 1 scroll attempt. Signalling for vision recovery.")
     return ""
