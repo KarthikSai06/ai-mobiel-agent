@@ -6,9 +6,15 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://python.org)
 [![ADB](https://img.shields.io/badge/ADB-Android%20Debug%20Bridge-green?logo=android)](https://developer.android.com/tools/adb)
-[![Gemini](https://img.shields.io/badge/LLM-Gemini%202.5%20Pro-orange?logo=google)](https://ai.google.dev/)
+[![Gemini](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-orange?logo=google)](https://ai.google.dev/)
 
 </div>
+
+---
+
+## 🎬 Demo
+
+[![Watch Demo](https://img.youtube.com/vi/T9zF86opMik/0.jpg)](https://youtu.be/T9zF86opMik)
 
 ---
 
@@ -18,9 +24,10 @@
 
 ```
 "Open YouTube, search for Believer, and play the first video"
+"Open Telegram and send hi to bujji"
+"Open Amazon, search for football, and add one to cart"
 "Turn off WiFi"
 "Set brightness to 50 percent"
-"Extract the text on the screen"
 ```
 
 The agent handles it all — reading the screen, planning each step, and executing ADB actions entirely autonomously.
@@ -33,7 +40,8 @@ The agent handles it all — reading the screen, planning each step, and executi
 |---|---|
 | 🗣️ **Natural language tasks** | Give any instruction in plain English |
 | 📱 **Real device control** | Works on physical Android phones via USB or WiFi (ADB) |
-| 🧠 **LLM action planning** | Powered by **Gemini 2.5 Pro** (OpenAI-compatible API) |
+| 🧠 **LLM action planning** | Powered by **Gemini 2.5 Flash** (OpenAI-compatible API) |
+| ⚡ **Optimized execution** | Lean step timing — ~2x faster than naive implementations |
 | 👁️ **Vision recovery** | When UI can't be read (ads/video), takes a screenshot and asks Gemini what to tap |
 | ✅ **Smart task completion** | Checks if task is already done (e.g. video playing) **before** attempting any recovery tap |
 | 📋 **Outcome tracking** | Every action is tracked as `SUCCESS`, `FAILED`, or `NO_CHANGE` — fed back to the LLM |
@@ -66,7 +74,7 @@ User Task (natural language)
                               │
                      ┌────────▼─────────┐
                      │  LLM Planner     │  planner/llm_planner.py
-                     │  (decides action)│  — text + vision planning (Gemini 2.5 Pro)
+                     │  (decides action)│  — text + vision planning (Gemini 2.5 Flash)
                      └────────┬─────────┘
                               │
                      ┌────────▼─────────┐
@@ -80,6 +88,27 @@ User Task (natural language)
    scroll        press_key     set_brightness  extract_text
                                (& 8 more...)
 ```
+
+---
+
+## ⚡ Performance
+
+Each agent step was optimized to minimize dead time between actions. Key improvements:
+
+| Optimization | Saving per step |
+|---|---|
+| **Removed redundant post-action UI re-dump** | ~3–4s |
+| **Trimmed pre-dump sleep** (1.5s → 0.4s) | ~1.1s |
+| **Trimmed end-of-step sleep** (2.0s → 1.0s) | ~1.0s |
+| **Trimmed vision action sleeps** (2.5s → 1.0s) | ~1.5s |
+
+**Net result: ~2x faster per task** on real-world benchmarks:
+
+| Task | Before | After |
+|---|---|---|
+| Open YouTube + search | ~3–4 min | ~2 min 18s |
+| Open Telegram + send message | ~3 min | ~1 min 13s |
+| Open Amazon + search + add to cart | ~3–4 min | ~1 min 37s |
 
 ---
 
@@ -109,15 +138,15 @@ mobile_agent/
 │   ├── press_key.py
 │   ├── save_memory.py
 │   ├── delete_memory.py
-│   ├── set_wifi.py             # NEW — Toggle WiFi
-│   ├── set_bluetooth.py        # NEW — Toggle Bluetooth
-│   ├── set_brightness.py       # NEW — Set screen brightness
-│   ├── set_volume.py           # NEW — Set audio volume
-│   ├── set_airplane_mode.py    # NEW — Toggle airplane mode
-│   ├── set_flashlight.py       # NEW — Toggle flashlight/torch
-│   ├── set_mobile_data.py      # NEW — Toggle mobile data
+│   ├── set_wifi.py             # Toggle WiFi
+│   ├── set_bluetooth.py        # Toggle Bluetooth
+│   ├── set_brightness.py       # Set screen brightness
+│   ├── set_volume.py           # Set audio volume
+│   ├── set_airplane_mode.py    # Toggle airplane mode
+│   ├── set_flashlight.py       # Toggle flashlight/torch
+│   ├── set_mobile_data.py      # Toggle mobile data
 │   ├── extract_text.py         # Extract all visible screen text
-│   └── take_screenshot.py      # NEW — Capture device screen as PNG
+│   └── take_screenshot.py      # Capture device screen as PNG
 └── tests/
     └── test_agent_fixes.py     # 10 unit tests (all passing)
 ```
@@ -142,12 +171,12 @@ pip install openai
 
 Edit `config/settings.py`:
 
-**Option A — Gemini 2.5 Pro (default, recommended)**
+**Option A — Gemini 2.5 Flash (default, recommended)**
 ```python
 OPENAI_API_KEY   = "AIzaSy..."                                    # Your Gemini API key
 LLM_BASE_URL     = "https://generativelanguage.googleapis.com/v1beta/openai/"
-LLM_MODEL        = "gemini-2.5-pro"
-LLM_VISION_MODEL = "gemini-2.5-pro"
+LLM_MODEL        = "gemini-2.5-flash"
+LLM_VISION_MODEL = "gemini-2.5-flash"
 ENABLE_VISION_FALLBACK = False  # Gemini handles vision natively
 ```
 
@@ -204,6 +233,13 @@ python main.py "Open Settings"
 # With device ID and step limit
 python main.py "Open YouTube and search for Believer" --device 10BF5P1PNN0010T --steps 20
 
+# Messaging tasks
+python main.py "Open Telegram and send hi to bujji" --steps 20
+python main.py "Open WhatsApp and send hi to Thanu Sree" --steps 20
+
+# E-commerce
+python main.py "Open Amazon, search for football, and add one to cart" --steps 20
+
 # System control tasks (no need to open Settings manually)
 python main.py "Turn off WiFi" --steps 3
 python main.py "Set brightness to 50 percent" --steps 3
@@ -216,10 +252,6 @@ python main.py "Read the text on screen and save it as page_content" --steps 3
 
 # Screenshot
 python main.py "Take a screenshot and save it as my_screen"
-
-# Messaging
-python main.py "Open WhatsApp and send hi to Thanu Sree" --steps 20
-python main.py "Open Telegram and send hi to bujji" --steps 20
 ```
 
 ---
