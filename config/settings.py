@@ -22,7 +22,7 @@ ENABLE_VISION_FALLBACK = False
 # ── Option B: Local Ollama (active) ───────────────────────────────────────────
 #OPENAI_API_KEY   = "dummy_key"
 #LLM_BASE_URL     = "http://localhost:11434/v1"
-#LLM_MODEL        = "qwen2.5vl:3b"
-#LLM_VISION_MODEL = "qwen2.5vl:3b"
+#LLM_MODEL        = "qwen2:1.5b"
+#LLM_VISION_MODEL = "qwen2:1.5b"
 #ENABLE_VISION_FALLBACK = True
 
