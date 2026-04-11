@@ -14,7 +14,9 @@
 
 ## 🎬 Demo
 
-[![Watch Demo](https://img.youtube.com/vi/T9zF86opMik/0.jpg)](https://youtu.be/T9zF86opMik)
+| Demo 1 | Demo 2 |
+|:---:|:---:|
+| [![Watch Demo 1](https://img.youtube.com/vi/T9zF86opMik/0.jpg)](https://youtu.be/T9zF86opMik) | [![Watch Demo 2](https://img.youtube.com/vi/WAjywZKRklM/0.jpg)](https://youtu.be/WAjywZKRklM) |
 
 ---
 
@@ -38,21 +40,21 @@ The agent handles it all — reading the screen, planning each step, and executi
 
 | Feature | Description |
 |---|---|
+| 🎙️ **Voice Assistant Integration** | Turn your phone into a system-level assistant triggerable by the Android Home button |
+| 🌐 **Remote Triggering** | Flask API server `api_server.py` with dynamic endpoints like `/stop` |
+| 🧠 **Claude Code Inspired** | Dream-lite memory consolidation and extensive JSON session logs |
+| 📝 **Task Refinement** | Automatically expands raw instructions into step-by-step UI plans |
 | 🗣️ **Natural language tasks** | Give any instruction in plain English |
 | 📱 **Real device control** | Works on physical Android phones via USB or WiFi (ADB) |
-| 🧠 **LLM action planning** | Powered by **Gemini 2.5 Flash** (OpenAI-compatible API) |
-| ⚡ **Optimized execution** | Lean step timing — ~2x faster than naive implementations |
-| 👁️ **Vision recovery** | When UI can't be read (ads/video), takes a screenshot and asks Gemini what to tap |
-| ✅ **Smart task completion** | Checks if task is already done (e.g. video playing) **before** attempting any recovery tap |
-| 📋 **Outcome tracking** | Every action is tracked as `SUCCESS`, `FAILED`, or `NO_CHANGE` — fed back to the LLM |
-| 🔁 **Loop detection** | Detects repeated identical actions and escalates to vision or BACK |
-| 🎯 **Smart element resolution** | Resolves elements by numeric index, resource ID, or text label |
-| 💬 **Messaging resilience** | Falls back to `ENTER` key when Send button taps produce no change |
-| 🔌 **System control skills** | Toggle WiFi, Bluetooth, airplane mode, flashlight, mobile data, brightness, and volume |
-| 📝 **Text extraction** | Extract all visible text from the current screen and save to agent memory |
+| 🧠 **LLM action planning** | Powered by **Gemini 2.5**, **OpenRouter**, or local **Ollama** models |
+| 🧠 **Persistent Memory** | Store elements or text and reference them via `@key` in future tasks |
+| ⚡ **Optimized execution** | Auto-selects `LocalLLMPlanner` for speed or `LLMPlanner` for complex tasks |
+| 👁️ **Vision Recovery** | Smart escalation to VLM models on loop, no-change, or element-not-found |
+| ✅ **Smart task completion** | Checks if task is already done via vision **before** recovery attempts |
+| 📋 **Outcome tracking** | Every action is tracked as `SUCCESS`, `FAILED`, or `NO_CHANGE` |
+| 🎯 **Smart element resolution** | Resolves elements by numeric index, text label, or resource ID |
+| 🔌 **System control skills** | Toggles for WiFi, BT, Airplane mode, Flashlight, Data, Volume, Brightness |
 | 📸 **Screenshot skill** | Capture the device screen and save as PNG on demand |
-| 🔌 **Pluggable skill system** | Add new skills by dropping a `.py` file in `skills/` |
-| 🧪 **Unit tested** | 10 tests covering all core behaviours, all passing |
 
 ---
 
@@ -112,41 +114,56 @@ Each agent step was optimized to minimize dead time between actions. Key improve
 
 ---
 
+## ⚠️ Findings & Limitations (Based on Recent Architecture Tests)
+
+Through extensive testing with local offline models (like `gemma4` or `qwen2.5:3b`) versus cloud models (like OpenRouter or Gemini), we discovered several key limitations and built mitigations for them:
+
+### 1. Hardware & VRAM Bottlenecks 
+LLMs need to run organically in your GPU's VRAM to achieve fast execution without stuttering.
+*   **Limitation:** If you have **4GB of VRAM** (e.g., RTX 3050), larger models (7B or 11B parameter models like `llama3.2-vision:11b`) will spill over into slow system RAM, causing severe latency in the agent loop.
+*   **Mitigation:** We highly advise using `qwen2.5:3b` for the core text planner and `moondream:latest` for the vision fallback on 4GB systems. This combination fits almost entirely inside the GPU and runs the agent loop blazingly fast.
+
+### 2. Local Model "Instruction Drift" (Hallucinations)
+Small local models (under 8B parameters) struggle to follow dense, rule-based system prompts, routinely making up non-existent skill names (e.g., outputting `SKILL: browser` instead of `SKILL: open_app`).
+*   **Mitigation:** We built a dedicated `LocalLLMPlanner`. Instead of long rules, it uses "Few-shot Examples". It also aggressively truncates the total UI element array to a maximum of 80 clickable-priority elements to prevent context-window overflow. Finally, it uses a built-in `_SKILL_ALIASES` dictionary to silently autocorrect hallucinated intents into valid internal skills.
+
+### 3. Cloud API Rate Limits
+During heavy automation sessions, free-tier endpoints on platforms like OpenRouter (e.g., `qwen3.6-plus:free`) will frequently hit `429 Too Many Requests` or `404 Not Found` limits. 
+*   **Mitigation:** The agent dynamically auto-selects its planner based on your `LLM_BASE_URL`. Simply swapping your settings to point to `localhost` instantly switches the framework to the robust, offline `LocalLLMPlanner` format without requiring code changes.
+
+---
+
 ## 📁 Project Structure
 
 ```
 mobile_agent/
-├── main.py                     # Entry point
+├── main.py                     # CLI entry point
+├── api_server.py               # Flask REST API (for remote triggering)
 ├── config/
 │   └── settings.py             # API keys, model selection, ADB path
 ├── agent/
-│   └── agent_loop.py           # Core agent loop + recovery logic
+│   └── agent_loop.py           # Core loop + vision recovery logic
 ├── planner/
-│   └── llm_planner.py          # LLM + vision model calls (task refiner + action planner)
+│   └── llm_planner.py          # Task Refiner + Action Planner
 ├── executor/
-│   └── skill_executor.py       # Action dispatcher + element resolver
+│   └── skill_executor.py       # Action dispatcher + @memory resolver
 ├── device/
 │   └── adb_controller.py       # Raw ADB command runner
 ├── ui/
-│   ├── dump_ui.py              # uiautomator dump with scroll-retry recovery
+│   ├── dump_ui.py              # uiautomator dump with recovery
 │   └── ui_parser.py            # XML → element list parser
 ├── skills/
 │   ├── open_app.py
-│   ├── tap.py
-│   ├── type_text.py
-│   ├── scroll.py
-│   ├── press_key.py
-│   ├── save_memory.py
-│   ├── delete_memory.py
-│   ├── set_wifi.py             # Toggle WiFi
-│   ├── set_bluetooth.py        # Toggle Bluetooth
-│   ├── set_brightness.py       # Set screen brightness
-│   ├── set_volume.py           # Set audio volume
-│   ├── set_airplane_mode.py    # Toggle airplane mode
-│   ├── set_flashlight.py       # Toggle flashlight/torch
-│   ├── set_mobile_data.py      # Toggle mobile data
-│   ├── extract_text.py         # Extract all visible screen text
-│   └── take_screenshot.py      # Capture device screen as PNG
+│   ├── tap.py / type_text.py
+│   ├── scroll.py / press_key.py
+│   ├── save_memory.py / delete_memory.py
+│   ├── summarize_text.py       # New: LLM content summary
+│   ├── set_wifi.py / set_bluetooth.py
+│   ├── set_brightness.py / set_volume.py
+│   ├── set_airplane_mode.py / set_flashlight.py
+│   ├── set_mobile_data.py
+│   ├── extract_text.py / take_screenshot.py
+│   └── done.py
 └── tests/
     └── test_agent_fixes.py     # 10 unit tests (all passing)
 ```
@@ -171,26 +188,25 @@ pip install openai
 
 Edit `config/settings.py`:
 
-**Option A — Gemini 2.5 Flash (default, recommended)**
+**Option A — OpenRouter / Claude (Recommended)**
+```python
+OPENAI_API_KEY   = "sk-or-v1-..."                                 # Your OpenRouter API key
+LLM_BASE_URL     = "https://openrouter.ai/api/v1"
+LLM_MODEL        = "anthropic/claude-3.5-sonnet"
+LLM_VISION_MODEL = "anthropic/claude-3.5-sonnet"
+```
+
+**Option B — Gemini 2.5 Flash**
 ```python
 OPENAI_API_KEY   = "AIzaSy..."                                    # Your Gemini API key
 LLM_BASE_URL     = "https://generativelanguage.googleapis.com/v1beta/openai/"
 LLM_MODEL        = "gemini-2.5-flash"
 LLM_VISION_MODEL = "gemini-2.5-flash"
-ENABLE_VISION_FALLBACK = False  # Gemini handles vision natively
-```
-
-**Option B — OpenRouter / OpenAI**
-```python
-OPENAI_API_KEY   = "sk-or-v1-..."
-LLM_BASE_URL     = "https://openrouter.ai/api/v1"
-LLM_MODEL        = "openai/gpt-4o-mini"
-LLM_VISION_MODEL = "openai/gpt-4o-mini"
 ```
 
 **Option C — Local Ollama (free, offline)**
-```python
-OPENAI_API_KEY   = "dummy_key"
+```bash
+# moondream is excellent for local vision fallback
 LLM_BASE_URL     = "http://localhost:11434/v1"
 LLM_MODEL        = "llama3.2:latest"
 LLM_VISION_MODEL = "moondream:latest"
@@ -227,31 +243,33 @@ adb connect <PHONE_IP>:5555
 ## 🚀 Usage
 
 ```bash
+### **Remote Triggering (Android Assistant)**
+Start the server:
+```bash
+python api_server.py
+```
+Trigger tasks via `curl` or **HTTP Shortcuts** on Android:
+```bash
+POST /run-task  {"task": "open youtube and search believer"}
+```
+
+### **CLI Usage**
+```bash
 # Basic task
 python main.py "Open Settings"
 
-# With device ID and step limit
-python main.py "Open YouTube and search for Believer" --device 10BF5P1PNN0010T --steps 20
+# Using persistent memory (store current page content then use it)
+python main.py "Read the screen and save as my_notes"
+python main.py "Open Telegram and send @my_notes to bujji"
 
-# Messaging tasks
-python main.py "Open Telegram and send hi to bujji" --steps 20
-python main.py "Open WhatsApp and send hi to Thanu Sree" --steps 20
+# System Control
+python main.py "Turn on flashlight"
+python main.py "Set media volume to 10"
+python main.py "Disable WiFi"
 
-# E-commerce
-python main.py "Open Amazon, search for football, and add one to cart" --steps 20
-
-# System control tasks (no need to open Settings manually)
-python main.py "Turn off WiFi" --steps 3
-python main.py "Set brightness to 50 percent" --steps 3
-python main.py "Set media volume to 8" --steps 3
-python main.py "Turn on flashlight" --steps 3
-python main.py "Enable airplane mode" --steps 3
-
-# Text extraction
-python main.py "Read the text on screen and save it as page_content" --steps 3
-
-# Screenshot
-python main.py "Take a screenshot and save it as my_screen"
+# Messaging
+python main.py "Open WhatsApp and send hi to Thanu Sree"
+```
 ```
 
 ---
@@ -261,22 +279,23 @@ python main.py "Take a screenshot and save it as my_screen"
 | Skill | Arguments | Description |
 |---|---|---|
 | `open_app` | `package_name` | Launch app via intent |
-| `tap` | `id` or `x, y` | Tap UI element or coordinates |
-| `type_text` | `text` | Type into focused field |
-| `scroll` | `x1, y1, x2, y2` | Swipe/scroll gesture |
+| `tap` | `id`, `x,y`, or `text` | Tap element by ID, coords, or **text label** |
+| `type_text` | `text` | Type text (supports `@memory_key` refs) |
+| `scroll` | `x1,y1,x2,y2` | Swipe/scroll gesture |
 | `press_key` | `key` | HOME, BACK, ENTER, VOLUME_UP, VOLUME_DOWN |
-| `save_memory` | `key, value` | Store coordinates or notes for later steps |
+| `save_memory` | `key, value` | Store coordinates or text for later |
 | `delete_memory` | `key` | Remove a saved memory entry |
-| `set_wifi` | `state=on\|off` | Toggle WiFi |
-| `set_bluetooth` | `state=on\|off` | Toggle Bluetooth |
-| `set_brightness` | `level, mode=manual\|auto` | Set brightness (0-255 or `50%`) |
-| `set_volume` | `level, stream` | Set volume (0-15) for media/ring/alarm/etc. |
-| `set_airplane_mode` | `state=on\|off` | Toggle airplane mode |
-| `set_flashlight` | `state=on\|off` | Toggle camera torch (Android 13+) |
-| `set_mobile_data` | `state=on\|off` | Toggle mobile data |
-| `extract_text` | `save_as` | Extract all visible text; optionally save to memory |
-| `take_screenshot` | `filename` (optional) | Capture device screen and save as PNG to `storage/screenshots/` |
-| `done` | — | Signal task is complete |
+| `summarize_text`| `save_as` | **Refined**: Summarize screen content via LLM |
+| `set_wifi` | `state=on|off` | Toggle WiFi |
+| `set_bluetooth` | `state=on|off` | Toggle Bluetooth |
+| `set_brightness` | `level, mode` | Set brightness (0-255 or `50%`) |
+| `set_volume` | `level, stream` | Set volume (0-15) for media/ring/etc |
+| `set_airplane_mode`| `state=on|off` | Toggle airplane mode |
+| `set_flashlight` | `state=on|off` | Toggle camera torch |
+| `set_mobile_data` | `state=on|off` | Toggle mobile data |
+| `extract_text` | `save_as` | Extract all visible text |
+| `take_screenshot`| `filename` | Save PNG to `storage/screenshots/` |
+| `done` | — | Signal task completion |
 
 ---
 
